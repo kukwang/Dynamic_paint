@@ -100,13 +100,11 @@ while True:
         fingers = detector.fingersUp()
         cv2.rectangle(color_img, (frameR, frameR), (wCam - frameR, hCam - frameR), (255, 0, 255), 2)
 
-        if x1 >= 0 and y1 >= 0:
-            # get distance from depth sensor to fingertip
+        if x1 >= 0 and y1 >= 0 and x1 < 480 and y1 < 640:
+            # get distance from depth sensor to fingertip, not stable
             distance1 = aligned_depth_frame.get_distance(x1, y1)
-
             # 4. Only Index Finger : Moving Mode
-            # index finger is stretched and distance < 1m, middle finger is bent
-#            if fingers[1] == 1 and fingers[2] == 0:
+            # index finger is stretched and distance <= max distance, middle finger is bent
             if fingers[1] == 1 and fingers[2] == 0 and distance1 <= max_distance:
                 # 5. Convert Coordinates
                 clocX = int(np.interp(x1, (frameR, wCam - frameR), (0, wScr)))
@@ -120,18 +118,18 @@ while True:
                 cv2.circle(depth_img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
 
             # 7. Both Index and middle fingers are up : Clicking Mode
-            # index finger and middle finger are stretched and distance < 1m
+            # index finger and middle finger are stretched and distance <= max distance
             if fingers[1] == 1 and fingers[2] == 1:
 
                 # 8. Find distance between fingers
                 length, color_img, lineInfo = detector.findDistance(8, 12, color_img)
                 _, depth_img, _ = detector.findDistance(8, 12, depth_img)
 
-                if x2 >= 0 and y2 >= 0:
+                if x2 >= 0 and y2 >= 0 and x2 < 480 and y2 < 640:
+                    # get distance from depth sensor to fingertip, not stable
                     distance2 = aligned_depth_frame.get_distance(x2, y2)
 
                     # 9. Click mouse if distance short
-#                    if length < 40:
                     if length < 40 and distance1 <= max_distance and distance2 <= max_distance:
                         cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
                         cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
