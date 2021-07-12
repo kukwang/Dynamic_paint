@@ -8,7 +8,6 @@ Website: https://www.murtazahassan.com/
 import pyrealsense2 as rs
 import cv2
 import mediapipe as mp
-import time
 import math
 import numpy as np
 
