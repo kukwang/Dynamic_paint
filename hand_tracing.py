@@ -1,18 +1,19 @@
 """
-Hand Tracing Module
+hand_tracing.py
 By: Murtaza Hassan
-Youtube: http://www.youtube.com/c/MurtazasWorkshopRoboticsandAI
-Website: https://www.murtazahassan.com/
+Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
+Website: https://www.computervision.zone/courses/ai-virtual-mouse/
+Modified by Kwangsoo Seol
 """
 
 import pyrealsense2 as rs
 import cv2
 import mediapipe as mp
+import time
 import math
-import numpy as np
 
 # define hand detection class
-class handDetector():
+class HandDetector():
     def __init__(self, mode=False, maxHands=2, detectionCon=0.5, trackCon=0.5):
         self.mode = mode
         self.maxHands = maxHands
@@ -27,7 +28,7 @@ class handDetector():
         self.tipIds = [4, 8, 12, 16, 20]
 
     # find hand from given image and draw landmarks of the hand
-    def findHands(self, img, draw=True):
+    def find_hands(self, img, draw=True):
         # conver BGR to RGB
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # processes an RGB image and returns the hand landmarks and handedness of each detected hand
@@ -41,7 +42,7 @@ class handDetector():
         return img
 
     # find hand position
-    def findPosition(self, img, handNo=0, draw=True):
+    def find_position(self, img, handNo=0, draw=True):
         xList = []
         yList = []
         bbox = []
@@ -75,7 +76,7 @@ class handDetector():
     # distinguish whether the fingers are facing up or down (stretched out or bend)
     # 1: facing up (stretched out)
     # 0: facing down (bend)
-    def fingersUp(self):
+    def fingers_up(self):
         fingers = []
         # thumb: compare x-coordinate of the fingertip and knuckle
         if self.lmList[self.tipIds[0]][1] > self.lmList[self.tipIds[0] - 1][1]:
@@ -96,7 +97,7 @@ class handDetector():
         return fingers
     
     # calculate distance between two points and drow circle
-    def findDistance(self, p1, p2, img, draw=True,r=15, t=3):
+    def find_distance(self, p1, p2, img, draw=True,r=15, t=3):
         x1, y1 = self.lmList[p1][1:]
         x2, y2 = self.lmList[p2][1:]
         # mid point of two points
