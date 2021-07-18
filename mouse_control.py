@@ -1,6 +1,7 @@
+# mouse_control.py
+
 import win32api, win32con
 from win32api import GetSystemMetrics
-DIST_THRESH = 20
 
 # The width of the screen of the primary display monitor, in pixels.
 wScr = GetSystemMetrics(0)
@@ -64,6 +65,8 @@ class Mouse:
 
     # set cursor position
     def set_pos(self, x, y):
+        # x, y must be integer
+        x, y = int(x), int(y)
         if x < 0:
             x = 0;
         elif x >= wScr:
@@ -77,6 +80,7 @@ class Mouse:
         if not self.clicked:
             self.x, self.y = x, y
 
+        # x, y must be integer
         win32api.SetCursorPos((self.x, self.y))
 
     # get cursor x, y position
@@ -93,7 +97,7 @@ class Mouse:
 sqrt = lambda x: x ** 0.5
 
 # calculate distance between two points
-def distance(point1, point2):
+def cal_distance(point1, point2):
     return (((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2))**(1/2)
 
 # monitor size
