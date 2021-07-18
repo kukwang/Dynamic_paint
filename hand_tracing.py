@@ -3,7 +3,7 @@ hand_tracing.py
 By: Murtaza Hassan
 Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
-Modified by Kwangsoo Seol
+Modified by kukwang
 """
 
 import pyrealsense2 as rs
