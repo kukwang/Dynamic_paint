@@ -7,20 +7,23 @@ from win32api import GetSystemMetrics
 wScr = GetSystemMetrics(0)
 # The height of the screen of the primary display monitor, in pixels. 
 hScr = GetSystemMetrics(1)
+
+
 class Mouse:
     SCROLL_INVERSE_GAIN = 20
+
     def __init__(self):
         self.clicked = False
         self.scrolling = False
-        self.init_x = 0 # for scrolling
-        self.init_y = 0 
+        self.init_x = 0  # for scrolling
+        self.init_y = 0
         self.x, self.y = win32api.GetCursorPos()
 
     # left mouse click
     def left_click(self):
         if self.clicked:
             return
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, self.x, self.y, 0, 0) #click is true
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, self.x, self.y, 0, 0)  # click is true
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, self.x, self.y, 0, 0)
 
     # left mouse press
@@ -92,13 +95,3 @@ class Mouse:
         self.left_unpress()
         self.right_unpress()
         self.__init__()
-        
-# calculate square root
-sqrt = lambda x: x ** 0.5
-
-# calculate distance between two points
-def cal_distance(point1, point2):
-    return (((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2))**(1/2)
-
-# monitor size
-print(wScr, 'x', hScr)

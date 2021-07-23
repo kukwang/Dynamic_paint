@@ -3,27 +3,38 @@ virtual_mouse.py
 By: Murtaza Hassan
 Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
-Modified by kukwang
+Modified by Kwangsoo Seol
 Using win32api
 """
-
+import pyrealsense2 as rs
 import cv2
 import numpy as np
 import time
 import hand_tracing
 import mouse_control
 
+
+# -----------------------------------------------------------------------------------------
+# helper function
+# -----------------------------------------------------------------------------------------
+# calculate distance between two points
+def cal_distance(point1, point2):
+    return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** (1 / 2)
+
+
 # -----------------------------------------------------------------------------------------
 # parameters
 # -----------------------------------------------------------------------------------------
-wCam, hCam = 640, 480   # window size
-frameR = 100            # Frame Reduction
+wCam, hCam = 640, 480  # window size
+frameR = 100  # Frame Reduction
 smoothening = 7
 pTime = 0
-plocX, plocY = 0, 0
-clocX, clocY = 0, 0
+prev_x1, prev_y1 = 0, 0
+cur_x1, cur_y1 = 0, 0
+mouse_x1, mouse_y1 = 0, 0
+velocity = 0
 distance = 0
-x1, y1 = 0, 0
+start = False
 
 # -----------------------------------------------------------------------------------------
 # connect to depth camera
@@ -62,10 +73,10 @@ depth_scale = depth_sensor.get_depth_scale()
 
 # We will be removing the background of objects more than
 # clipping_distance_in_meters meters away
-max_distance_in_meters = 2 #1 meter
+max_distance_in_meters = 2  # 1 meter
 max_distance = max_distance_in_meters / depth_scale
-threshold_dis1 = 0.75/depth_scale
-threshold_dis2 = 1.25/depth_scale
+threshold_dis1 = 0.75 / depth_scale
+threshold_dis2 = 1.25 / depth_scale
 
 # create an align object
 # rs.align allows us to perform alignment of depth frames to others frames
@@ -77,9 +88,10 @@ align = rs.align(align_to)
 detector = hand_tracing.HandDetector(maxHands=1)
 mouse = mouse_control.Mouse()
 
-cnt = 0
+# -----------------------------------------------------------------------------------------
+# start
+# -----------------------------------------------------------------------------------------
 while True:
-    cnt += 1
     # -----------------------------------------------------------------------------------------
     # get color, depth image from depth camera
     # -----------------------------------------------------------------------------------------
@@ -91,7 +103,7 @@ while True:
     aligned_frames = align.process(frames)
 
     # Get aligned frames
-    aligned_depth_frame = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
+    aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
     color_frame = aligned_frames.get_color_frame()
 
     # Validate that both frames are valid
@@ -106,7 +118,7 @@ while True:
 
     # 1. Find hand Landmarks
     color_img = detector.find_hands(color_img, draw=True)
-    lmList, bbox = detector.find_position(color_img)
+    lmList, bbox = detector.find_position(color_img, draw=True)
 
     # 2. Get the tip of the index and middle fingers
     if len(lmList) != 0:
@@ -117,9 +129,8 @@ while True:
         fingers = detector.fingers_up()
         cv2.rectangle(color_img, (frameR, frameR), (wCam - frameR, hCam - frameR), (255, 0, 255), 2)
 
-        
         # prevent indexError
-        if x1 >= 0 and y1 >= 0 and x1 < 640 and y1 < 480:
+        if 640 > x1 >= 0 and 480 > y1 >= 0:
             # get distance from depth sensor to fingertip
             distance1 = depth_img[y1][x1]
 
@@ -129,28 +140,30 @@ while True:
                 # index finger is stretched and distance <= max distance, middle finger is bent
                 if fingers[1] == 1 and fingers[2] == 0:
                     # 5. Convert Coordinates
-                    clocX = np.interp(x1, (frameR, wCam - frameR), (0, wScr))
-                    clocY = np.interp(y1, (frameR, hCam - frameR), (0, hScr))
+                    cur_x1 = np.interp(x1, (frameR, wCam - frameR), (0, mouse_control.wScr))
+                    cur_y1 = np.interp(y1, (frameR, hCam - frameR), (0, mouse_control.hScr))
 
                     # 6. Smoothen Values
-                    clocX = plocX + (clocX - plocX) / smoothening
-                    clocY = plocY + (clocY - plocY) / smoothening
+                    if distance > 2:
+                        cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
+                        cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
 
                     # to remove effect of vibration
-                    if velocity > 0:
+                    if velocity > 3:
                         # 7. Move Mouse
                         # mouse.set_pos(0, 0): top right
                         # mouse.set_pos(wScr, hScr): bottom left
-                        mouse.set_pos(clocX, clocY)
+                        mouse.set_pos(cur_x1, cur_y1)
                         cv2.circle(color_img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
                         cv2.circle(depth_img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
-                        
+                        mouse_x1, mouse_y1 = cur_x1, cur_y1
+
                     # --------------------------------------------------------------
                     # calculate distance
                     # --------------------------------------------------------------
-                    distance = mouse_control.cal_distance([clocX, clocY], [plocX, plocY]) 
-                    
-                    plocX, plocY = clocX, clocY
+                    distance = cal_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
+
+                    prev_x1, prev_y1 = cur_x1, cur_y1
 
                 # prevent indexError
                 if x2 >= 0 and y2 >= 0 and x2 < 640 and y2 < 480:
@@ -163,7 +176,8 @@ while True:
                         _, depth_img, _ = detector.find_distance(8, 12, depth_img)
 
                         # 10. Click mouse if distance short
-                        if length < 40:
+                        #                        if length < 40:
+                        if velocity > 3 and length < 40:
                             cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
                             cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
                             mouse.left_click()
@@ -190,11 +204,11 @@ while True:
     cv2.imshow("color_img", color_img)
     cv2.imshow("depth_img", depth_img)
 
-    
     # ESC break the while loop
     if cv2.waitKey(1) == 27:
         break
 
+# -----------------------------------------------------------------------------------------
 # release camera and close the window
 cv2.destroyAllWindows()
 pipeline.stop()

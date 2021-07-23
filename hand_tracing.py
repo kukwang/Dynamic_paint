@@ -3,17 +3,16 @@ hand_tracing.py
 By: Murtaza Hassan
 Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
-Modified by kukwang
+Modified by Kwangsoo Seol
 """
 
-import pyrealsense2 as rs
 import cv2
 import mediapipe as mp
-import time
 import math
 
+
 # define hand detection class
-class HandDetector():
+class HandDetector:
     def __init__(self, mode=False, maxHands=2, detectionCon=0.5, trackCon=0.5):
         self.mode = mode
         self.maxHands = maxHands
@@ -66,13 +65,13 @@ class HandDetector():
             xmin, xmax = min(xList), max(xList)
             ymin, ymax = min(yList), max(yList)
             bbox = xmin, ymin, xmax, ymax
-            
+
             # draw cropped region
             if draw:
                 cv2.rectangle(img, (xmin - 20, ymin - 20), (xmax + 20, ymax + 20), (0, 255, 0), 2)
 
         return self.lmList, bbox
-    
+
     # distinguish whether the fingers are facing up or down (stretched out or bend)
     # 1: facing up (stretched out)
     # 0: facing down (bend)
@@ -86,18 +85,18 @@ class HandDetector():
 
         # other fingers
         for id in range(1, 5):
-            # compare y-coordinate of the fingertip and knuckle 
+            # compare y-coordinate of the fingertip and knuckle
             if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2]:
                 fingers.append(1)
             else:
                 fingers.append(0)
 
-        #totalFingers = fingers.count(1)
+        # totalFingers = fingers.count(1)
         # return finger informations
         return fingers
-    
+
     # calculate distance between two points and drow circle
-    def find_distance(self, p1, p2, img, draw=True,r=15, t=3):
+    def find_distance(self, p1, p2, img, draw=True, r=15, t=3):
         x1, y1 = self.lmList[p1][1:]
         x2, y2 = self.lmList[p2][1:]
         # mid point of two points
