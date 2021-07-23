@@ -67,6 +67,7 @@ def mouse_draw(event, x, y, flags, param):
 def change_radius(radius, velocity, isSteady):
     global max_radius
 
+    scaling = 1
     sensitvity = 0.05
     velo_shift = 10
     initial = 3
@@ -74,7 +75,7 @@ def change_radius(radius, velocity, isSteady):
     if isSteady:
         return 
     else:
-        radius = (np.exp((velocity - velo_shift) * sensitvity) + initial).astype(int) 
+        radius = (scaling * np.exp((velocity - velo_shift) * sensitvity) + initial).astype(int) 
         if radius >= max_radius:
             return max_radius
         else:
