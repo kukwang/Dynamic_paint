@@ -4,19 +4,14 @@ import win32api, win32con
 from win32api import GetSystemMetrics
 
 # The width of the screen of the primary display monitor, in pixels.
-wScr = GetSystemMetrics(0)
+scr_width = GetSystemMetrics(0)
 # The height of the screen of the primary display monitor, in pixels. 
-hScr = GetSystemMetrics(1)
+scr_height = GetSystemMetrics(1)
 
 
 class Mouse:
-    SCROLL_INVERSE_GAIN = 20
-
     def __init__(self):
         self.clicked = False
-        self.scrolling = False
-        self.init_x = 0  # for scrolling
-        self.init_y = 0
         self.x, self.y = win32api.GetCursorPos()
 
     # left mouse click
@@ -31,8 +26,6 @@ class Mouse:
         if self.clicked:
             return
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, self.x, self.y, 0, 0)
-        self.init_x = self.x
-        self.init_y = self.y
         self.clicked = True
 
     # left mouse unpress
@@ -55,8 +48,6 @@ class Mouse:
             return
         x, y = win32api.GetCursorPos()
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, self.x, self.y, 0, 0)
-        self.init_x = self.x
-        self.init_y = self.y
         self.clicked = True
 
     # right mouse unpress
@@ -72,12 +63,12 @@ class Mouse:
         x, y = int(x), int(y)
         if x < 0:
             x = 0;
-        elif x >= wScr:
-            x = wScr;
+        elif x >= scr_width:
+            x = scr_width;
         if y < 0:
             y = 0;
-        elif y >= hScr:
-            y = hScr;
+        elif y >= scr_height:
+            y = scr_height;
         point = (x, y)
 
         if not self.clicked:
