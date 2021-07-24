@@ -19,7 +19,7 @@ import mouse_control
 # -----------------------------------------------------------------------------------------
 cam_width, cam_height = 640, 480            # window size
 max_distance_in_meters = 2                  # depth threshold
-box_init = 20                               # half of initialize box length
+box_init = 10                               # half of initialize box length
 
 frame_reduc = 100                           # Frame Reduction
 smoothening = 7                             # smoothening cursor move
@@ -32,32 +32,6 @@ past_time = 0                               # to calculate velocity and fps
 # -----------------------------------------------------------------------------------------
 # helper function
 # -----------------------------------------------------------------------------------------
-"""
-# get color, depth image from depth camera
-def get_frames(pl, al):
-    # wait for a coherent pair of frames: depth and color
-    frames = pl.wait_for_frames()
-
-    # frames.get_depth_frame() is a 640x360 depth image
-    # align the depth frame to color frame
-    aligned_frames = al.process(frames)
-
-    # get aligned frames
-    aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
-    color_frame = aligned_frames.get_color_frame()
-
-    # validate that both frames are valid
-    if not aligned_depth_frame or not color_frame:
-        return False, False
-
-    c_img = np.asanyarray(color_frame.get_data())
-    d_img = np.asanyarray(aligned_depth_frame.get_data())
-    c_img = cv2.flip(c_img, 1)
-    d_img = cv2.flip(d_img, 1)
-
-    return c_img, d_img
-"""
-
 
 # calculate distance between two points
 def get_distance(pt1, pt2):
@@ -176,7 +150,7 @@ while True:
             # if index finger is up and fingertip is in the frame
             if fingers[1] and 0 <= x1 < 640 and 0 <= y1 < 480:
 
-                cv2.circle(color_img, (x1, y1), 10, (255, 0, 255), cv2.FILLED)
+                cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
 
                 # if index finger is in the given area, start initialize
                 if left_top_x < x1 < right_bottom_x and left_top_y < y1 < right_bottom_y:
@@ -191,12 +165,13 @@ while True:
                     cur_x1 = prev_x1 + (x1 - prev_x1) / smoothening
                     cur_y1 = prev_y1 + (y1 - prev_y1) / smoothening
 
-                    # calculate threshold velocity
                     distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
+                    prev_x1, prev_y1 = cur_x1, cur_y1
+
+                    # calculate threshold velocity
                     cur_time = time.time()
                     velocity = int(distance / (cur_time - velo_init_time) / 30)
                     velo_init_time = cur_time
-                    prev_x1, prev_y1 = cur_x1, cur_y1
 
                     # if distance is large than vibration init, update it
                     if vib_init < velocity:
@@ -303,8 +278,8 @@ while True:
                             # mouse.set_pos(0, 0): top right
                             # mouse.set_pos(scr_width, scr_height): bottom left
                             mouse.set_pos(cur_x1, cur_y1)
-                            cv2.circle(color_img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
-                            cv2.circle(depth_img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
+                            cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
+                            cv2.circle(depth_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
     
                         # calculate distance
                         distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
@@ -323,8 +298,8 @@ while True:
                             # 10. click mouse if distance short
                             # length < 40:
                             if velocity > vib_init and length < 40:
-                                cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
-                                cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
+                                cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
+                                cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
                                 mouse.left_click()
     
         # apply colormap on depth image (image must be converted to 8-bit per pixel first)
