@@ -13,6 +13,7 @@ import time
 
 import hand_tracing
 import mouse_control
+import painter_class
 
 # -----------------------------------------------------------------------------------------
 # parameters 1
@@ -84,6 +85,7 @@ align = rs.align(align_to)
 # assign HandDetector and Mouse class
 detector = hand_tracing.HandDetector(maxHands=1)
 mouse = mouse_control.Mouse()
+paint = painter_class.Paint()
 
 while True:
     # -----------------------------------------------------------------------------------------
@@ -155,14 +157,11 @@ while True:
                     cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
 
                     # smoothen Values
-                    #if distance > 2:
                     cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
                     cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
 
                     std_distance = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
                     # to reduce effect of vibration
-                    #if velocity > vib_vel_init or distance > vib_dis_init:
-                    #if velocity > vib_vel_init:
                     if std_distance > vib_dis_init:
                         # move Mouse
                         # mouse.set_pos(0, 0): top right
