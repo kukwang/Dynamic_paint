@@ -18,7 +18,7 @@ import mouse_control
 # parameters 1
 # -----------------------------------------------------------------------------------------
 cam_width, cam_height = 640, 480            # window size
-max_distance_in_meters = 2                  # depth threshold
+max_distance_in_meters = 1                  # depth threshold
 box_init = 10                               # half of initialize box length
 
 frame_reduc = 100                           # Frame Reduction
@@ -29,15 +29,13 @@ velocity = 0                                # cursor velocity
 distance = 0                                # distance between two points
 past_time = 0                               # to calculate velocity and fps
 
+
 # -----------------------------------------------------------------------------------------
 # helper function
 # -----------------------------------------------------------------------------------------
-
 # calculate distance between two points
 def get_distance(pt1, pt2):
     return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2) ** (1 / 2)
-
-# -----------------------------------------------------------------------------------------
 
 
 # -----------------------------------------------------------------------------------------
@@ -92,14 +90,18 @@ while True:
     # -----------------------------------------------------------------------------------------
     # parameters 2
     # -----------------------------------------------------------------------------------------
-    vib_init = 0            # vibration threshold
+    vib_vel_init = 0        # vibration velocity threshold
+    vib_dis_init = 4       # vibration distance threshold
     vib_init_time = 0
     start_init = False      # start initialize flag
     finish_init = False     # initialization flag
     pressed_key = 0         # pressed key in keyboard
     velo_init_time = 0       # to calculate init velocity
+    std_distance = 0
+    stopped_x1, stopped_y1 = 0, 0
     # -----------------------------------------------------------------------------------------
 
+    """
     # -----------------------------------------------------------------------------------------
     # vibration threshold initialization
     # -----------------------------------------------------------------------------------------
@@ -174,8 +176,8 @@ while True:
                     velo_init_time = cur_time
 
                     # if distance is large than vibration init, update it
-                    if vib_init < velocity:
-                        vib_init = velocity
+                    if vib_vel_init < velocity:
+                        vib_vel_init = velocity
 
                     # if init time is more than 3 second, finish vibration initialization
                     if cur_time - vib_init_time > 5:
@@ -185,7 +187,7 @@ while True:
                 # if index finger is out of given area, stop initialize
                 else:
                     start_init = False
-                    vib_init = 0
+                    vib_vel_init = 0
 
         # apply colormap on depth image (image must be converted to 8-bit per pixel first)
         # dimension: 640x480 -> 640x480x3
@@ -211,7 +213,7 @@ while True:
 
     if pressed_key == 27:
         break
-
+    """
     # -----------------------------------------------------------------------------------------
     # start
     # -----------------------------------------------------------------------------------------
@@ -219,18 +221,18 @@ while True:
         # -----------------------------------------------------------------------------------------
         # get color, depth image from depth camera
         # -----------------------------------------------------------------------------------------
-        # Wait for a coherent pair of frames: depth and color
+        # wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
     
         # frames.get_depth_frame() is a 640x360 depth image
         # Align the depth frame to color frame
         aligned_frames = align.process(frames)
     
-        # Get aligned frames
+        # get aligned frames
         aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
         color_frame = aligned_frames.get_color_frame()
     
-        # Validate that both frames are valid
+        # validate that both frames are valid
         if not aligned_depth_frame or not color_frame:
             continue
     
@@ -240,85 +242,89 @@ while True:
         depth_img = cv2.flip(depth_img, 1)
         # -----------------------------------------------------------------------------------------
     
-        # 1. find hand Landmarks
-        color_img = detector.find_hands(color_img, draw=True)
-        lmList, _ = detector.find_position(color_img, draw=True)
-    
-        # 2. get the tip of the index and middle fingers
+        # find hand Landmarks
+        color_img = detector.find_hands(color_img, draw=False)
+        lmList, _ = detector.find_position(color_img, draw=False)
+
+        # get the tip of the index and middle fingers
         if len(lmList) != 0:
             x1, y1 = lmList[8][1:]
             x2, y2 = lmList[12][1:]
-    
-            # 3. check which fingers are up
+
+            # check which fingers are up
             fingers = detector.fingers_up()
             cv2.rectangle(color_img, (frame_reduc, frame_reduc), (cam_width - frame_reduc, cam_height - frame_reduc), (255, 0, 255), 2)
-    
+
             # to prevent indexError
             if 0 <= x1 < 640 and 0 <= y1 < 480:
                 # get distance from depth sensor to fingertip
                 index_distance = depth_img[y1][x1]
-    
+
                 # control the mouse only when it is closer than max_distance
                 if index_distance <= max_distance:
-                    # 4. only Index Finger : Moving Mode
+                    # only Index Finger : Moving Mode
                     # index finger is stretched and distance <= max distance, middle finger is bent
                     if fingers[1] == 1 and fingers[2] == 0:
-                        # 5. convert Coordinates
+                        # convert Coordinates
                         cur_x1 = np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width))
                         cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
     
-                        # 6. smoothen Values
-                        if distance > 2:
-                            cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
-                            cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
-    
-                        # to remove effect of vibration
-                        if velocity > vib_init:
-                            # 7. move Mouse
+                        # smoothen Values
+#                        if distance > 2:
+                        cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
+                        cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
+
+                        std_distance = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
+                        # to reduce effect of vibration
+#                        if velocity > vib_vel_init or distance > vib_dis_init:
+#                        if velocity > vib_vel_init:
+                        if std_distance > vib_dis_init:
+                            # move Mouse
                             # mouse.set_pos(0, 0): top right
                             # mouse.set_pos(scr_width, scr_height): bottom left
                             mouse.set_pos(cur_x1, cur_y1)
                             cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
                             cv2.circle(depth_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
-    
+                            stopped_x1, stopped_y1 = prev_x1, prev_y1
+
                         # calculate distance
                         distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
                         prev_x1, prev_y1 = cur_x1, cur_y1
     
                     # to prevent indexError
                     if 0 <= x2 < 640 and 0 <= y2 < 480:
-                        # 8. both Index and middle fingers are up : Clicking Mode
+                        # both Index and middle fingers are up : Clicking Mode
                         # index finger and middle finger are stretched and distance <= max distance
                         if fingers[1] == 1 and fingers[2] == 1:
     
-                            # 9. find distance between fingers
-                            length, color_img, lineInfo = detector.find_distance(8, 12, color_img)
-                            _, depth_img, _ = detector.find_distance(8, 12, depth_img)
+                            # find distance between fingers
+                            length, color_img, lineInfo = detector.find_distance(8, 12, color_img, r=5)
+                            _, depth_img, _ = detector.find_distance(8, 12, depth_img, r=5)
     
-                            # 10. click mouse if distance short
+                            # click mouse if distance short
                             # length < 40:
-                            if velocity > vib_init and length < 40:
+#                            if velocity > vib_vel_init and length < 40:
+                            if std_distance > vib_dis_init and length < 40:
                                 cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
                                 cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
-                                mouse.left_click()
+#                                mouse.left_click()
     
         # apply colormap on depth image (image must be converted to 8-bit per pixel first)
         # dimension: 640x480 -> 640x480x3
         depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.1), cv2.COLORMAP_JET)
         depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGR2GRAY)
     
-        # 11. fps and velocity(pixel / sec / 50)
+        # fps and velocity(pixel / sec / 50)
         cur_time = time.time()
         fps = 1 / (cur_time - past_time)
-        velocity = int(distance / (cur_time - past_time) / 30)
+        velocity = int(distance / (cur_time - past_time) / 50)
         past_time = cur_time
         cv2.putText(color_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
         cv2.putText(depth_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
+        cv2.putText(color_img, str(velocity) + 'pixel / second / scale_factor', (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+        cv2.putText(color_img, str(std_distance) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
-        # show velocity of the mouse
-        cv2.putText(color_img, str(velocity) + 'pixel / second / 30', (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
-    
-        # 12. display
+        # display
         cv2.imshow("color_img", color_img)
         cv2.imshow("depth_img", depth_img)
     
