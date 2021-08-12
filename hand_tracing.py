@@ -91,8 +91,7 @@ class HandDetector:
             else:
                 fingers.append(0)
 
-        # totalFingers = fingers.count(1)
-        # return finger informations
+        # return fingers information
         return fingers
 
     # calculate distance between two points and drow circle
