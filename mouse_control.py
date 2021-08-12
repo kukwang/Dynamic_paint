@@ -1,11 +1,12 @@
 # mouse_control.py
-
 import win32api, win32con
 from win32api import GetSystemMetrics
 
 # The width of the screen of the primary display monitor, in pixels.
+# In here, 1920
 scr_width = GetSystemMetrics(0)
-# The height of the screen of the primary display monitor, in pixels. 
+# The height of the screen of the primary display monitor, in pixels.
+# In here, 1080
 scr_height = GetSystemMetrics(1)
 
 
