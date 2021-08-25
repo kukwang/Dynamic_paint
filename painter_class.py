@@ -5,7 +5,7 @@ import numpy as np
 
 class Paint:
     # paint area is quarter of the screen size
-    def __init__(self, width=1920, height=1080, radius_smoothening = 0):
+    def __init__(self, width=1920, height=1080, radius_smoothening = 7):
         self.bgr = [0, 0, 0]                                                # rgb color of brush
         self.is_initial = True                                              # check if this class run first time
         self.max_radius = 30                                                # max radius of brush
