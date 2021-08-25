@@ -4,14 +4,17 @@ import numpy as np
 
 
 class Paint:
-    def __init__(self):
-        self.bgr = [0, 0, 0]                                        # rgb color of brush
-        self.is_initial = True                                      # check if this class run first time
-        self.max_radius = 50                                        # max radius of brush
-        self.src = np.full((270, 480, 3), 255, dtype=np.uint8)      # paint in this area
+    # paint area is quarter of the screen size
+    def __init__(self, width=1920, height=1080, radius_smoothening = 0):
+        self.bgr = [0, 0, 0]                                                # rgb color of brush
+        self.is_initial = True                                              # check if this class run first time
+        self.max_radius = 30                                                # max radius of brush
+        self.src = np.full((height//2, width//2, 3), 255, dtype=np.uint8)   # paint in this area
+        self.radius_smoothening = radius_smoothening
+        self.prev_radius, self.cur_radius = 0, 0
+        cv2.imshow("palette", self.src)
 
-    def draw(self, mouse, prev_loc, cur_loc, velocity, is_steady):
-        clicked = mouse.clicked
+    def draw(self, clicked, prev_loc, cur_loc, velocity, is_steady):
         radius = self.change_radius(velocity, is_steady)
 
         # 마우스 왼쪽 버튼이 눌러져 있을 때 검은 원을 그림
@@ -32,7 +35,7 @@ class Paint:
         else:
             self.is_initial = True
 
-        print('v : ' + str(velocity) + ' r : ' + str(self.radius))
+        print('v : ' + str(velocity) + ' r : ' + str(radius))
 
     def change_radius(self, velocity, is_steady):
         scaling = 3
@@ -42,10 +45,15 @@ class Paint:
         if is_steady:
             return
         else:
-            radius = (scaling * np.exp((velo_shift - velocity) * sensitivity)).astype(int)
-            if radius >= self.max_radius:
+            # update current radius using current velocity
+            self.cur_radius = int(scaling * np.exp((velo_shift - velocity) * sensitivity))
+            # to make smooth
+            self.cur_radius = int(self.prev_radius + (self.cur_radius - self.prev_radius) / self.radius_smoothening)
+            self.prev_radius = self.cur_radius
+            #self.cur_radius = int(velo_shift - velocity)
+            if self.cur_radius >= self.max_radius:
                 return self.max_radius
-            elif radius < 1:
+            elif self.cur_radius < 1:
                 return 1
             else:
-                return radius
+                return self.cur_radius
