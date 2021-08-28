@@ -13,6 +13,7 @@ import time
 
 import hand_tracing
 import mouse_control
+import painter_class
 
 # -----------------------------------------------------------------------------------------
 # parameters 1
@@ -85,6 +86,7 @@ align = rs.align(align_to)
 # assign HandDetector and Mouse class
 detector = hand_tracing.HandDetector(maxHands=1)
 mouse = mouse_control.Mouse()
+paint = painter_class.Paint(width=int(mouse_control.scr_width), height=int(mouse_control.scr_height))
 
 while True:
     # -----------------------------------------------------------------------------------------
@@ -270,21 +272,22 @@ while True:
                         cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
     
                         # smoothen Values
-#                        if distance > 2:
-                        cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
-                        cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
+                        #if distance > 2:
+                        cur_x1 = int(prev_x1 + (cur_x1 - prev_x1) / smoothening)
+                        cur_y1 = int(prev_y1 + (cur_y1 - prev_y1) / smoothening)
 
                         std_distance = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
                         # to reduce effect of vibration
-#                        if velocity > vib_vel_init or distance > vib_dis_init:
-#                        if velocity > vib_vel_init:
+                        #if velocity > vib_vel_init or distance > vib_dis_init:
+                        #if velocity > vib_vel_init:
                         if std_distance > vib_dis_init:
                             # move Mouse
                             # mouse.set_pos(0, 0): top right
                             # mouse.set_pos(scr_width, scr_height): bottom left
-                            mouse.set_pos(cur_x1, cur_y1)
+                            #mouse.set_pos(cur_x1, cur_y1)
                             cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
                             cv2.circle(depth_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
+                            paint.draw(True, [prev_x1 // 2, prev_y1 // 2], [cur_x1 // 2, cur_y1 // 2], velocity, False)
                             stopped_x1, stopped_y1 = prev_x1, prev_y1
 
                         # calculate distance
@@ -303,11 +306,11 @@ while True:
     
                             # click mouse if distance short
                             # length < 40:
-#                            if velocity > vib_vel_init and length < 40:
+                            #if velocity > vib_vel_init and length < 40:
                             if std_distance > vib_dis_init and length < 40:
                                 cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
                                 cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
-#                                mouse.left_click()
+                                #mouse.left_click()
     
         # apply colormap on depth image (image must be converted to 8-bit per pixel first)
         # dimension: 640x480 -> 640x480x3
