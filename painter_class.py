@@ -5,12 +5,12 @@ import numpy as np
 
 class Paint:
     # paint area is quarter of the screen size
-    def __init__(self, width=1920, height=1080, radius_smoothening = 7):
+    def __init__(self, width=1920, height=1080):
         self.bgr = [0, 0, 0]                                                # rgb color of brush
         self.is_initial = True                                              # check if this class run first time
-        self.max_radius = 30                                                # max radius of brush
+        self.max_radius = 50                                                # max radius of brush
         self.src = np.full((height//2, width//2, 3), 255, dtype=np.uint8)   # paint in this area
-        self.radius_smoothening = radius_smoothening
+        self.radius_smoothening = 7
         self.prev_radius, self.cur_radius = 0, 0
         cv2.imshow("palette", self.src)
 
@@ -53,7 +53,7 @@ class Paint:
             #self.cur_radius = int(velo_shift - velocity)
             if self.cur_radius >= self.max_radius:
                 return self.max_radius
-            elif self.cur_radius < 1:
-                return 1
+            elif self.cur_radius < 3:
+                return 3
             else:
                 return self.cur_radius
