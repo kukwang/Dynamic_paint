@@ -67,17 +67,19 @@ def mouse_draw(event, x, y, flags, param):
 def change_radius(radius, velocity, isSteady):
     global max_radius
 
-    scaling = 1
-    sensitvity = 0.05
-    velo_shift = 10
-    initial = 3
-    
+    scaling = 3
+    sensitivity = 0.1
+    velo_shift = 30
+    initial = 0
+
     if isSteady:
-        return 
+        return
     else:
-        radius = (scaling * np.exp((velocity - velo_shift) * sensitvity) + initial).astype(int) 
+        radius = (scaling * np.exp((velo_shift - velocity) * sensitivity) + initial).astype(int)
         if radius >= max_radius:
             return max_radius
+        elif radius < 1:
+            return 1
         else:
             return radius
 
@@ -95,7 +97,8 @@ prev_point = (0, 0)
 # initial 상태 확인
 isInitial = True
 
-src = np.full((960, 1024, 3), 255, dtype=np.uint8)
+# 1080/4, 1920/4
+src = np.full((270, 480, 3), 255, dtype=np.uint8)
 
 cv2.namedWindow("palette")
 cv2.createTrackbar("Red", "palette", 0, 255, lambda x : x)
