@@ -5,6 +5,8 @@ Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
 Modified by Kwangsoo Seol
 Using win32api
+
+problem: 한 point에서 입력을 멈췄다가 다른 point에서 입력을 재개하면 점을 그리는게 아니라 선을 그리는거라 줄이 쫙 그어짐
 """
 import pyrealsense2 as rs
 import cv2
@@ -65,7 +67,6 @@ if not found_rgb:
 config.enable_stream(rs.stream.depth, cam_width, cam_height, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, cam_width, cam_height, rs.format.bgr8, 30)
 
-
 # start streaming
 profile = pipeline.start(config)
 # -----------------------------------------------------------------------------------------
@@ -103,119 +104,6 @@ while True:
     stopped_x1, stopped_y1 = 0, 0
     # -----------------------------------------------------------------------------------------
 
-    """
-    # -----------------------------------------------------------------------------------------
-    # vibration threshold initialization
-    # -----------------------------------------------------------------------------------------
-    while not finish_init:
-        # -----------------------------------------------------------------------------------------
-        # get color, depth image from depth camera
-        # -----------------------------------------------------------------------------------------
-        # Wait for a coherent pair of frames: depth and color
-        frames = pipeline.wait_for_frames()
-
-        # frames.get_depth_frame() is a 640x360 depth image
-        # Align the depth frame to color frame
-        aligned_frames = align.process(frames)
-
-        # Get aligned frames
-        aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
-        color_frame = aligned_frames.get_color_frame()
-
-        # Validate that both frames are valid
-        if not aligned_depth_frame or not color_frame:
-            continue
-
-        color_img = np.asanyarray(color_frame.get_data())
-        depth_img = np.asanyarray(aligned_depth_frame.get_data())
-        color_img = cv2.flip(color_img, 1)
-        depth_img = cv2.flip(depth_img, 1)
-        # -----------------------------------------------------------------------------------------
-
-        # find hand Landmarks
-        color_img = detector.find_hands(color_img, draw=False)
-        lmList, _ = detector.find_position(color_img, draw=False)
-
-        # get the position of the index fingertip
-        if len(lmList) != 0:
-            # index fingertip position
-            x1, y1 = lmList[8][1:]
-
-            # check which finger is up
-            fingers = detector.fingers_up()
-
-            # left top: 0,0
-            # rectangle: left top, right bottom
-            left_top_x, left_top_y = cam_width // 2 - box_init, cam_height // 2 - box_init
-            right_bottom_x, right_bottom_y = cam_width // 2 + box_init, cam_height // 2 + box_init
-            cv2.rectangle(color_img, (cam_width // 2 - box_init, cam_height // 2 - box_init),
-                          (cam_width // 2 + box_init, cam_height // 2 + box_init), (255, 0, 255), 2)
-
-            # if index finger is up and fingertip is in the frame
-            if fingers[1] and 0 <= x1 < 640 and 0 <= y1 < 480:
-
-                cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
-
-                # if index finger is in the given area, start initialize
-                if left_top_x < x1 < right_bottom_x and left_top_y < y1 < right_bottom_y:
-                    # start measuring time
-                    if not start_init:
-                        vib_init_time = time.time()
-                        # set init position
-                        prev_x1, prev_y1 = x1, y1
-
-                    start_init = True
-
-                    cur_x1 = prev_x1 + (x1 - prev_x1) / smoothening
-                    cur_y1 = prev_y1 + (y1 - prev_y1) / smoothening
-
-                    distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
-                    prev_x1, prev_y1 = cur_x1, cur_y1
-
-                    # calculate threshold velocity
-                    cur_time = time.time()
-                    velocity = int(distance / (cur_time - velo_init_time) / 30)
-                    velo_init_time = cur_time
-
-                    # if distance is large than vibration init, update it
-                    if vib_vel_init < velocity:
-                        vib_vel_init = velocity
-
-                    # if init time is more than 3 second, finish vibration initialization
-                    if cur_time - vib_init_time > 5:
-                        finish_init = True
-                        start_init = False
-
-                # if index finger is out of given area, stop initialize
-                else:
-                    start_init = False
-                    vib_vel_init = 0
-
-        # apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        # dimension: 640x480 -> 640x480x3
-        depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.1), cv2.COLORMAP_JET)
-        depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGR2GRAY)
-
-        # show fps and velocity
-        cur_time = time.time()
-        fps = 1 / (cur_time - past_time)
-        past_time = cur_time
-        cv2.putText(color_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
-        cv2.putText(depth_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
-        cv2.putText(color_img, str(velocity) + 'pixel / second / 30', (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
-
-        # display
-        cv2.imshow("color_img", color_img)
-        cv2.imshow("depth_img", depth_img)
-
-        # ESC breaks the while loop
-        pressed_key = cv2.waitKey(1)
-        if pressed_key == 27:
-            break
-
-    if pressed_key == 27:
-        break
-    """
     # -----------------------------------------------------------------------------------------
     # start
     # -----------------------------------------------------------------------------------------
@@ -237,13 +125,17 @@ while True:
         # validate that both frames are valid
         if not aligned_depth_frame or not color_frame:
             continue
-    
+
+        # color_img: numpy.uint8(cv2.CV_8U)
+        # depth_img: numpy.uint16(cv2.CV_16U)
         color_img = np.asanyarray(color_frame.get_data())
         depth_img = np.asanyarray(aligned_depth_frame.get_data())
         color_img = cv2.flip(color_img, 1)
         depth_img = cv2.flip(depth_img, 1)
+        depth_img = depth_img.astype(np.uint8)
+#        depth_img_filtered = cv2.bilateralFilter(depth_img, 9, 72, 72)
         # -----------------------------------------------------------------------------------------
-    
+
         # find hand Landmarks
         color_img = detector.find_hands(color_img, draw=False)
         lmList, _ = detector.find_position(color_img, draw=False)
@@ -265,8 +157,10 @@ while True:
                 # control the mouse only when it is closer than max_distance
                 if index_distance <= max_distance:
                     # only Index Finger : Moving Mode
-                    # index finger is stretched and distance <= max distance, middle finger is bent
-                    if fingers[1] == 1 and fingers[2] == 0:
+                    # index finger is stretched and middle finger is bent
+                    #if fingers[1] == 1 and fingers[2] == 0:
+                    # if middle finger is bent
+                    if fingers[2] == 0:
                         # convert Coordinates
                         cur_x1 = np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width))
                         cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
@@ -287,6 +181,7 @@ while True:
                             #mouse.set_pos(cur_x1, cur_y1)
                             cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
                             cv2.circle(depth_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
+                            # // 2: paint area is quarter of the screen size
                             paint.draw(True, [prev_x1 // 2, prev_y1 // 2], [cur_x1 // 2, cur_y1 // 2], velocity, False)
                             stopped_x1, stopped_y1 = prev_x1, prev_y1
 
@@ -330,7 +225,8 @@ while True:
         # display
         cv2.imshow("color_img", color_img)
         cv2.imshow("depth_img", depth_img)
-    
+#        cv2.imshow("depth_img_filtered", depth_img_filtered)
+
         # ESC breaks the while loop
         pressed_key = cv2.waitKey(1)
         if pressed_key == 27:
