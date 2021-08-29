@@ -16,19 +16,25 @@ import mouse_control
 import painter_class
 
 # -----------------------------------------------------------------------------------------
-# parameters 1
+# parameters
 # -----------------------------------------------------------------------------------------
-cam_width, cam_height = 640, 480  # window size
-max_distance_in_meters = 1  # depth threshold
-box_init = 10  # half of initialize box length
+cam_width, cam_height = 640, 480    # window size
+max_distance_in_meters = 1          # depth threshold
+base_depth_img = []                 # base depth image info
 
-frame_reduc = 100  # Frame Reduction
-smoothening = 7  # smoothening cursor move
-prev_x1, prev_y1 = 0, 0  # previous cursor position
-cur_x1, cur_y1 = 0, 0  # current cursor position
-velocity = 0  # cursor velocity
-distance = 0  # distance between two points
-past_time = 0  # to calculate velocity and fps
+frame_reduc = 100                   # Frame Reduction
+smoothening = 7                     # smoothening cursor move
+prev_x1, prev_y1 = 0, 0             # previous cursor position
+cur_x1, cur_y1 = 0, 0               # current cursor position
+stopped_x1, stopped_y1 = 0, 0       # last update cursor position
+virtual_distance = 0                # distance between last update position and current position
+
+vib_dis_init = 4                    # vibration distance threshold
+pressed_key = 0                     # pressed key in keyboard
+click_height = 5                    # verify click operation
+velocity = 0                        # cursor velocity
+distance = 0                        # distance between two points
+past_time = 0                       # to calculate velocity and fps
 
 
 # -----------------------------------------------------------------------------------------
@@ -86,21 +92,30 @@ align = rs.align(align_to)
 detector = hand_tracing.HandDetector(maxHands=1)
 mouse = mouse_control.Mouse()
 paint = painter_class.Paint()
-
+# -----------------------------------------------------------------------------------------
 while True:
     # -----------------------------------------------------------------------------------------
-    # parameters 2
+    # base initialization
     # -----------------------------------------------------------------------------------------
-    vib_vel_init = 0  # vibration velocity threshold
-    vib_dis_init = 4  # vibration distance threshold
-    vib_init_time = 0
-    start_init = False  # start initialize flag
-    finish_init = False  # initialization flag
-    pressed_key = 0  # pressed key in keyboard
-    velo_init_time = 0  # to calculate init velocity
-    std_distance = 0
-    stopped_x1, stopped_y1 = 0, 0
-    # -----------------------------------------------------------------------------------------
+    while True:
+        # wait for a coherent pair of frames: depth and color
+        frames = pipeline.wait_for_frames()
+
+        # frames.get_depth_frame() is a 640x360 depth image
+        # Align the depth frame to color frame
+        aligned_frames = align.process(frames)
+
+        # get aligned frames
+        aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
+
+        # validate that both frames are valid
+        if not aligned_depth_frame:
+            continue
+
+        else:
+            base_depth_img = np.asanyarray(aligned_depth_frame.get_data())
+            base_depth_img = cv2.flip(base_depth_img, -1)
+            break
 
     # -----------------------------------------------------------------------------------------
     # start
@@ -137,7 +152,6 @@ while True:
         # get the tip of the index and middle fingers
         if len(lmList) != 0:
             x1, y1 = lmList[8][1:]
-            x2, y2 = lmList[12][1:]
 
             # check which fingers are stretched
             cv2.rectangle(color_img, (frame_reduc, frame_reduc), (cam_width - frame_reduc, cam_height - frame_reduc),
@@ -145,40 +159,40 @@ while True:
 
             # to prevent indexError
             if 0 <= x1 < 640 and 0 <= y1 < 480:
+                # only Index Finger : Moving Mode
+                # index finger is stretched and distance <= max distance, middle finger is bent
+                # convert Coordinates
+                cur_x1 = np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width))
+                cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
+
+                # smoothen Values
+                cur_x1 = int(prev_x1 + (cur_x1 - prev_x1) / smoothening)
+                cur_y1 = int(prev_y1 + (cur_y1 - prev_y1) / smoothening)
+
+                virtual_distance = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
+                # to reduce effect of vibration
+                if virtual_distance > vib_dis_init:
+                    # move Mouse
+                    # mouse.set_pos(0, 0): top right
+                    # mouse.set_pos(scr_width, scr_height): bottom left
+                    #mouse.set_pos(cur_x1, cur_y1)
+                    # // 2: paint area is quarter of the screen size
+                    paint.draw(mouse.clicked, [prev_x1//2, prev_y1//2], [cur_x1//2, cur_y1//2], velocity, False)
+                    cv2.circle(color_img, (x1, y1), 5, (0, 255, 0), cv2.FILLED)
+                    cv2.circle(depth_img, (x1, y1), 5, (0, 255, 0), cv2.FILLED)
+                    stopped_x1, stopped_y1 = prev_x1, prev_y1
+
+                # calculate distance
+                distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
+                prev_x1, prev_y1 = cur_x1, cur_y1
+                # click part
                 # get distance from depth sensor to fingertip
                 index_distance = depth_img[y1][x1]
-
-                # control the mouse only when it is closer than max_distance
-                if index_distance <= max_distance:
-                    # only Index Finger : Moving Mode
-                    # index finger is stretched and distance <= max distance, middle finger is bent
-                    # convert Coordinates
-                    cur_x1 = np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width))
-                    cur_y1 = np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height))
-
-                    # smoothen Values
-                    cur_x1 = prev_x1 + (cur_x1 - prev_x1) / smoothening
-                    cur_y1 = prev_y1 + (cur_y1 - prev_y1) / smoothening
-
-                    std_distance = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
-                    # to reduce effect of vibration
-                    if std_distance > vib_dis_init:
-                        # move Mouse
-                        # mouse.set_pos(0, 0): top right
-                        # mouse.set_pos(scr_width, scr_height): bottom left
-                        mouse.set_pos(cur_x1, cur_y1)
-                        cv2.circle(color_img, (x1, y1), 5, (0, 255, 0), cv2.FILLED)
-                        cv2.circle(depth_img, (x1, y1), 5, (0, 255, 0), cv2.FILLED)
-                        stopped_x1, stopped_y1 = prev_x1, prev_y1
-
-                    # calculate distance
-                    distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
-                    prev_x1, prev_y1 = cur_x1, cur_y1
-
-                    """
-                    # click part
-
-                    """
+                print('index dis:', index_distance, 'base dis:', base_depth_img[y1][x1])
+                #if index_distance > base_depth_img[y1][x1] + click_height:
+                #    mouse.left_unpress()
+                #elif index_distance <= base_depth_img[y1][x1] + click_height:
+                #    mouse.left_press()
 
         # apply colormap on depth image (image must be converted to 8-bit per pixel first)
         # dimension: 640x480 -> 640x480x3
@@ -193,21 +207,20 @@ while True:
         cv2.putText(color_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
         cv2.putText(depth_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
         cv2.putText(color_img, str(velocity) + 'pixel / second / scale_factor', (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
-        cv2.putText(color_img, str(std_distance) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+        cv2.putText(color_img, str(virtual_distance) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
         # display
         cv2.imshow("color_img", color_img)
         cv2.imshow("depth_img", depth_img)
 
-        # ESC breaks the while loop
+        # ESC breaks the while loop twice
+        # 'r' key breaks the while loop and restart base initialization(114 is 'r' in ascii code)
         pressed_key = cv2.waitKey(1)
-        if pressed_key == 27:
+        if pressed_key == 27 or pressed_key == 114:
             break
-
     if pressed_key == 27:
         break
 
 # release camera and close the window
 cv2.destroyAllWindows()
 pipeline.stop()
-
