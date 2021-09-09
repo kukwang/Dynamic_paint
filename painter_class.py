@@ -4,56 +4,53 @@ import numpy as np
 
 
 class Paint:
-    # paint area is quarter of the screen size
+    # palette is quarter of the screen size
     def __init__(self, width=1920, height=1080):
-        self.bgr = [0, 0, 0]                                                # rgb color of brush
-        self.is_initial = True                                              # check if this class run first time
-        self.max_radius = 50                                                # max radius of brush
-        self.src = np.full((height//2, width//2, 3), 255, dtype=np.uint8)   # paint in this area
-        self.radius_smoothening = 7
-        self.prev_radius, self.cur_radius = 0, 0
+        self.bgr = [0, 0, 0]    # rgb color of brush
+        # palette: size is (height//2 * width//2), 3 channels, color is white
+        self.src = np.full((height//2, width//2, 3), 255, dtype=np.uint8)
+        self.prev_radius, self.cur_radius = 0, 0    # previous and current radius, initial value is 0
+
+        # if this class called, show palette
         cv2.imshow("palette", self.src)
 
-    def draw(self, clicked, prev_loc, cur_loc, velocity, is_steady):
-        radius = self.change_radius(velocity, is_steady)
+    # function that draw line in the palette(self.src)
+    def draw(self, is_initial, prev_loc=0, cur_loc=0, velocity=0):
+        # calculate radius
+        radius = self.change_radius(velocity)
 
-        # 마우스 왼쪽 버튼이 눌러져 있을 때 검은 원을 그림
-        if clicked:
-            if self.is_initial:
-                self.is_initial = False
-            else:
-                cv2.line(self.src, prev_loc, cur_loc, self.bgr, thickness=radius, lineType=cv2.LINE_AA)
+        # if cur mouse position is not first position, draw line between prev and cur position at palette
+        if not is_initial:
+            cv2.line(self.src, prev_loc, cur_loc, self.bgr, thickness=radius, lineType=cv2.LINE_AA)
 
-            cv2.imshow("palette", self.src)
-
-        # 만약, event가 마우스 스크롤을 조작했다면, 다시 하위 분기문(if)을 생성하여 나눔
-        # event가 마우스 스크롤 이벤트일 때, flag는 마우스 스크롤의 방향을 나타냄
-        # flag가 양수라면 스크롤 업, 음수라면 스크롤 다운
-        # 마우스 스크롤 업 이벤트일 때는 반지름(radius)를 증가시키고, 낮을 때에는 반지름을 감소
-        # 단, 반지름이 1보다 작지 않게 설정하기 위해, radius > 1 조건으로 검사
-
-        else:
-            self.is_initial = True
-
+        cv2.imshow("palette", self.src)
         print('v : ' + str(velocity) + ' r : ' + str(radius))
 
-    def change_radius(self, velocity, is_steady):
+    # function that change brush size according to velocity of index fingertip
+    def change_radius(self, velocity):
+        # parameters that we use to calculate brush size(radius)
         scaling = 3
         sensitivity = 0.1
         velo_shift = 30
+        radius_smoothening = 7
 
-        if is_steady:
-            return
+        max_radius = 50     # max radius of brush
+        min_radius = 3      # min radius of brush
+
+        # update current radius using current velocity
+        self.cur_radius = int(scaling * np.exp((velo_shift - velocity) * sensitivity))
+        # to make change of the radius smooth,
+        # reflect only some of the changes between previous and current radius
+        self.cur_radius = int(self.prev_radius + (self.cur_radius - self.prev_radius) / radius_smoothening)
+        # Update previous radius to current radius
+        self.prev_radius = self.cur_radius
+
+        # if current radius is larger than max_radius we set, radius is max_radius
+        # if current radius is smaller than min_radius we set, radius is min_radius
+        # else, radius is current radius
+        if self.cur_radius >= max_radius:
+            return max_radius
+        elif self.cur_radius < min_radius:
+            return min_radius
         else:
-            # update current radius using current velocity
-            self.cur_radius = int(scaling * np.exp((velo_shift - velocity) * sensitivity))
-            # to make smooth
-            self.cur_radius = int(self.prev_radius + (self.cur_radius - self.prev_radius) / self.radius_smoothening)
-            self.prev_radius = self.cur_radius
-            #self.cur_radius = int(velo_shift - velocity)
-            if self.cur_radius >= self.max_radius:
-                return self.max_radius
-            elif self.cur_radius < 3:
-                return 3
-            else:
-                return self.cur_radius
+            return self.cur_radius
