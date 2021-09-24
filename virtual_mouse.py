@@ -101,7 +101,7 @@ align = rs.align(align_to)
 
 # assign HandDetector and Mouse class
 detector = hand_tracing.HandDetector(maxHands=1)
-mouse = mouse_control.Mouse()
+#mouse = mouse_control.Mouse()
 paint = painter_class.Paint(width=int(mouse_control.scr_width), height=int(mouse_control.scr_height))
 
 # -----------------------------------------------------------------------------------------
@@ -143,14 +143,14 @@ while True:
     color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
 
     # find hand and its landmarks
-    color_img = detector.find_hands(color_img, draw=False)
+    color_img = detector.find_hands(color_img, draw=True)
     lmList, _ = detector.find_position(color_img, draw=False)
 
     # if hand is detected, proceed to the next process
     if len(lmList) != 0:
         # get the fingertip of the index and middle fingers
         x1, y1 = lmList[8][1:]
-        x2, y2 = lmList[12][1:]
+        #x2, y2 = lmList[12][1:]
 
         # check if fingers are up
         fingers = detector.fingers_up()
@@ -208,19 +208,9 @@ while True:
                 # -----------------------------------------------------------------------------------------
                 # Only Index Finger : Not Draw Mode
                 # -----------------------------------------------------------------------------------------
-                # to prevent indexError, limit the position of middle fingertip point
-                elif 0 <= x2 < 640 and 0 <= y2 < 480:
-
-                    # find distance between index fingertip and middle fingertip
-                    length, color_img, lineInfo = detector.find_distance(8, 12, color_img, r=5)
-                    _, depth_img, _ = detector.find_distance(8, 12, depth_img, r=5)
-
-                    # if distance between index and middle fingertip is shorter than 40, mouse click
-                    # vir_dis > vib_dis: to reduce effect of vibration
-                    if vir_dis > vib_dis and length < 40:
-                        # draw green circle to show mouse click is processed
-                        cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
-                        #mouse.left_click()
+                else:
+                    # make initial flag True
+                    is_initial = True
 
                 # show distance between current cursor position and last cursor updated position in color image
                 cv2.putText(color_img, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
