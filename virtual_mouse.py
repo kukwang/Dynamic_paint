@@ -6,8 +6,6 @@ Website: https://www.computervision.zone/courses/ai-virtual-mouse/
 Modified by Kwangsoo Seol
 Using win32api
 
-have to move is_initial variable into the draw function in Paint class
-
 have to do
     stabilize depth value of the index fingertip (sometimes depth value is dramatically change)
     method
@@ -41,7 +39,7 @@ def get_distance(pt1, pt2):
 # parameters
 # -----------------------------------------------------------------------------------------
 cam_width, cam_height = 640, 480    # window size
-max_dis_in_meters = 1          # depth threshold
+max_dis_in_meters = 1.5             # maximum sensing distance in meters
 
 frame_reduc = 100                   # Frame Reduction
 smoothening = 7                     # smoothening cursor move
@@ -52,9 +50,11 @@ prev_x1, prev_y1 = 0, 0             # previous cursor position
 cur_x1, cur_y1 = 0, 0               # current cursor position
 stopped_x1, stopped_y1 = 0, 0       # last updated cursor position
 
-vib_dis = 4                    # vibration distance threshold
+vib_dis = 4                         # vibration distance threshold
 pressed_key = 0                     # pressed key in keyboard
-is_initial = True                  # to reset prev, cur position
+is_initial = True                   # to reset prev, cur position
+
+prev_depth, cur_depth = 0, 0
 
 # -----------------------------------------------------------------------------------------
 # connect to depth camera
@@ -126,9 +126,21 @@ while True:
     depth_img = np.asanyarray(aligned_depth_frame.get_data())
     color_img = cv2.flip(color_img, 1)
     depth_img = cv2.flip(depth_img, 1)
-    depth_img = depth_img.astype(np.uint8)
-    # depth_img_filtered = cv2.bilateralFilter(depth_img, 9, 72, 72)
+    # chagne datatype (unit16 -> unit8)
+    depth_img_u8 = depth_img.astype(np.uint8)
+
+    # all filters have kernal size: 3x3
+    # apply average burring
+    depth_img_avg = cv2.blur(depth_img_u8, (3, 3))
+    # apply gaussian blurring
+    depth_img_gaussian = cv2.GaussianBlur(depth_img_u8, (3, 3), 0)
+    # apply median blurring
+    depth_img_median = cv2.medianBlur(depth_img_u8, 3)
+    # apply bilateral blurring
+    depth_img_bilateral = cv2.bilateralFilter(depth_img_u8, 3, 75, 75)
     # -----------------------------------------------------------------------------------------
+
+    color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
 
     # find hand and its landmarks
     color_img = detector.find_hands(color_img, draw=False)
@@ -150,18 +162,16 @@ while True:
         # sometimes index fingertip position
         if 0 <= x1 < 640 and 0 <= y1 < 480:
             # get distance from depth sensor to fingertip
-            index_dis = depth_img[y1][x1]
+            index_dis = depth_img_u8[y1][x1]
+
             # control the mouse only when it is closer than max_distance
             if index_dis <= max_dis:
                 # convert coordinates
-                cur_x1 = int(np.interp(x1, (frame_reduc, cam_width - frame_reduc),
-                                       (0, mouse_control.scr_width)))
-                cur_y1 = int(np.interp(y1, (frame_reduc, cam_height - frame_reduc),
-                                       (0, mouse_control.scr_height)))
+                cur_x1 = int(np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width)))
+                cur_y1 = int(np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height)))
                 # smoothen values
                 # if cur point is initial point, do not smoothening
                 if is_initial:
-                    is_initial = False
                     prev_x1, prev_y1 = cur_x1, cur_y1
 
                 else:
@@ -171,19 +181,22 @@ while True:
                 # calculate distance between current cursor position and last cursor updated position
                 vir_dis = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
 
-                # only Index Finger : Moving Mode
-                # if middle finger is bent, proceed the process
-                if fingers[2] == 0:
+                # -----------------------------------------------------------------------------------------
+                # Index and Middle Finger : Draw Mode
+                # -----------------------------------------------------------------------------------------
+                # if middle finger is stretched, draw line in the palette
+                if fingers[2] == 1:
                     # to reduce effect of vibration
                     if vir_dis > vib_dis:
                         # move Mouse
                         # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
                         #mouse.set_pos(cur_x1, cur_y1)
                         cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
-                        cv2.circle(depth_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
                         # //2 operation: palette is quarter of the screen size
-                        paint.draw(is_initial, [prev_x1 // 2, prev_y1 // 2], [cur_x1 // 2, cur_y1 // 2],
-                                   velocity)
+                        if not is_initial:
+                            paint.draw(is_initial, [prev_x1 // 2, prev_y1 // 2], [cur_x1 // 2, cur_y1 // 2], velocity)
+                        else:
+                            is_initial = False
                         stopped_x1, stopped_y1 = prev_x1, prev_y1
 
                     # calculate distance between current position and previous position
@@ -192,30 +205,28 @@ while True:
                     # update previous position to current position
                     prev_x1, prev_y1 = cur_x1, cur_y1
 
-                # if middle finger is up : Clicking Mode
+                # -----------------------------------------------------------------------------------------
+                # Only Index Finger : Not Draw Mode
+                # -----------------------------------------------------------------------------------------
                 # to prevent indexError, limit the position of middle fingertip point
                 elif 0 <= x2 < 640 and 0 <= y2 < 480:
+
                     # find distance between index fingertip and middle fingertip
                     length, color_img, lineInfo = detector.find_distance(8, 12, color_img, r=5)
                     _, depth_img, _ = detector.find_distance(8, 12, depth_img, r=5)
-                    is_initial = True
 
                     # if distance between index and middle fingertip is shorter than 40, mouse click
                     # vir_dis > vib_dis: to reduce effect of vibration
                     if vir_dis > vib_dis and length < 40:
                         # draw green circle to show mouse click is processed
                         cv2.circle(color_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
-                        cv2.circle(depth_img, (lineInfo[4], lineInfo[5]), 5, (0, 255, 0), cv2.FILLED)
                         #mouse.left_click()
 
                 # show distance between current cursor position and last cursor updated position in color image
-                cv2.putText(color_img, str(vir_dis) + 'pixel', (20, 90),
-                            cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+                cv2.putText(color_img, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
     # apply colormap on depth image (image must be converted to 8-bit per pixel first)
-    # dimension: 640x480 -> 640x480x3
-    depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.1), cv2.COLORMAP_JET)
-    depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGR2GRAY)
+    depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.03), cv2.COLORMAP_JET)
 
     # calculate fps and velocity(pixel / sec / 50)
     cur_time = time.time()
@@ -229,8 +240,12 @@ while True:
                 (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
     # display color and depth image
-    cv2.imshow("color_img", color_img)
+    #cv2.imshow("color_img", color_img)
+    cv2.imshow("color_img_reduc", color_img_reduc)
     cv2.imshow("depth_img", depth_img)
+
+    merged_blur_result = np.hstack((depth_img_avg, depth_img_gaussian))
+    merged_blur_result2 = np.hstack((depth_img_median, depth_img_bilateral))
 
     # ESC breaks the while loop
     pressed_key = cv2.waitKey(1)
