@@ -24,7 +24,6 @@ class Paint:
             cv2.line(self.src, prev_loc, cur_loc, self.bgr, thickness=radius, lineType=cv2.LINE_AA)
 
         cv2.imshow("palette", self.src)
-        print('v : ' + str(velocity) + ' r : ' + str(radius))
 
     # function that change brush size according to velocity of index fingertip
     def change_radius(self, velocity):
