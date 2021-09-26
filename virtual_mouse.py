@@ -5,17 +5,6 @@ Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
 Modified by Kwangsoo Seol
 Using win32api
-
-have to do
-    stabilize depth value of the index fingertip (sometimes depth value is dramatically change)
-    method
-    1. store prev depth value
-    - if difference between prev and cur depth value is bigger than threshold, use prev value and didn't update
-    - if user move finger too fast, it can be work badly
-    2. use good filter
-    - remove noise in the depth image, make depth image clean and get depth value
-    - have to find good filter (filter in opencv is not good)
-    - have to check fps
 """
 import pyrealsense2 as rs
 import cv2
@@ -46,9 +35,9 @@ smoothening = 7                     # smoothening cursor move
 velocity = 0                        # cursor velocity
 distance = 0                        # distance between two points
 past_time = 0                       # to calculate velocity and fps
-prev_x1, prev_y1 = 0, 0             # previous cursor position
-cur_x1, cur_y1 = 0, 0               # current cursor position
-stopped_x1, stopped_y1 = 0, 0       # last updated cursor position
+prev_index_x, prev_index_y = 0, 0             # previous cursor position
+cur_index_x, cur_index_y = 0, 0               # current cursor position
+stopped_index_x, stopped_index_y = 0, 0       # last updated cursor position
 
 vib_dis = 4                         # vibration distance threshold
 pressed_key = 0                     # pressed key in keyboard
@@ -149,8 +138,8 @@ while True:
     # if hand is detected, proceed to the next process
     if len(lmList) != 0:
         # get the fingertip of the index and middle fingers
-        x1, y1 = lmList[8][1:]
-        #x2, y2 = lmList[12][1:]
+        index_x, index_y = lmList[8][1:]
+        middle_x, middle_y = lmList[12][1:]
 
         # check if fingers are up
         fingers = detector.fingers_up()
@@ -160,60 +149,61 @@ while True:
 
         # to prevent indexError, limit the position of index fingertip point
         # sometimes index fingertip position
-        if 0 <= x1 < 640 and 0 <= y1 < 480:
+        if 0 <= index_x < 640 and 0 <= index_y < 480:
             # get distance from depth sensor to fingertip
-            index_dis = depth_img_u8[y1][x1]
+            index_dis = depth_img_u8[index_y][index_x]
 
             # control the mouse only when it is closer than max_distance
             if index_dis <= max_dis:
                 # convert coordinates
-                cur_x1 = int(np.interp(x1, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width)))
-                cur_y1 = int(np.interp(y1, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height)))
+                cur_index_x = int(np.interp(index_x, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width)))
+                cur_index_y = int(np.interp(index_y, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height)))
                 # smoothen values
                 # if cur point is initial point, do not smoothening
                 if is_initial:
-                    prev_x1, prev_y1 = cur_x1, cur_y1
+                    prev_index_x, prev_index_y = cur_index_x, cur_index_y
 
                 else:
-                    cur_x1 = int(prev_x1 + (cur_x1 - prev_x1) / smoothening)
-                    cur_y1 = int(prev_y1 + (cur_y1 - prev_y1) / smoothening)
+                    cur_index_x = int(prev_index_x + (cur_index_x - prev_index_x) / smoothening)
+                    cur_index_y = int(prev_index_y + (cur_index_y - prev_index_y) / smoothening)
 
                 # calculate distance between current cursor position and last cursor updated position
-                vir_dis = get_distance([cur_x1, cur_y1], [stopped_x1, stopped_y1])
+                vir_dis = get_distance([cur_index_x, cur_index_y], [stopped_index_x, stopped_index_y])
 
                 # -----------------------------------------------------------------------------------------
-                # Index and Middle Finger : Draw Mode
+                # Index and Middle Finger is stretched: Draw Mode
                 # -----------------------------------------------------------------------------------------
                 # if middle finger is stretched, draw line in the palette
-                if fingers[2] == 1:
+                if fingers[1] == 1 and fingers[2] == 1:
                     # to reduce effect of vibration
                     if vir_dis > vib_dis:
                         # move Mouse
                         # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
-                        #mouse.set_pos(cur_x1, cur_y1)
-                        cv2.circle(color_img, (x1, y1), 5, (255, 0, 255), cv2.FILLED)
+                        #mouse.set_pos(cur_index_x, cur_index_y)
+                        cv2.circle(color_img, (index_x, index_y), 5, (255, 0, 255), cv2.FILLED)
                         # //2 operation: palette is quarter of the screen size
                         if not is_initial:
-                            paint.draw(is_initial, [prev_x1 // 2, prev_y1 // 2], [cur_x1 // 2, cur_y1 // 2], velocity)
+                            paint.draw(is_initial, [prev_index_x // 2, prev_index_y // 2],
+                                       [cur_index_x // 2, cur_index_y // 2], velocity)
                         else:
                             is_initial = False
-                        stopped_x1, stopped_y1 = prev_x1, prev_y1
+                        stopped_index_x, stopped_index_y = prev_index_x, prev_index_y
 
                     # calculate distance between current position and previous position
                     # this operation used in calculating velocity
-                    distance = get_distance([cur_x1, cur_y1], [prev_x1, prev_y1])
+                    distance = get_distance([cur_index_x, cur_index_y], [prev_index_x, prev_index_y])
                     # update previous position to current position
-                    prev_x1, prev_y1 = cur_x1, cur_y1
+                    prev_index_x, prev_index_y = cur_index_x, cur_index_y
 
                 # -----------------------------------------------------------------------------------------
-                # Only Index Finger : Not Draw Mode
+                # Index or Middle Finger is bend: Not Draw Mode
                 # -----------------------------------------------------------------------------------------
                 else:
                     # make initial flag True
                     is_initial = True
 
                 # show distance between current cursor position and last cursor updated position in color image
-                cv2.putText(color_img, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+                cv2.putText(color_img_reduc, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
     # apply colormap on depth image (image must be converted to 8-bit per pixel first)
     depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.03), cv2.COLORMAP_JET)
@@ -225,8 +215,8 @@ while True:
     past_time = cur_time
 
     # show fps and velocity in color image
-    cv2.putText(color_img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
-    cv2.putText(color_img, str(velocity) + 'pixel / second / scale_factor',
+    cv2.putText(color_img_reduc, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
+    cv2.putText(color_img_reduc, str(velocity) + 'pixel / second / scale_factor',
                 (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
     # display color and depth image
