@@ -24,6 +24,17 @@ def get_distance(pt1, pt2):
     return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2) ** (1 / 2)
 
 
+# calculate interpolated position
+def get_interp_pos(pt, fr, cw, ch, scw, sch):
+    interp_pt = [int(np.interp(pt[0], (fr, cw - fr), (0, scw))), int(np.interp(pt[1], (fr, ch - fr), (0, sch)))]
+    return interp_pt
+
+
+# calculate smoothened position
+def get_smoothen_pos(prev_pt, cur_pt, sm):
+    sm_pt = [int(prev_pt[0] + (cur_pt[0] - prev_pt[0]) / sm), int(prev_pt[1] + (cur_pt[1] - prev_pt[1]) / sm)]
+    return sm_pt
+
 # -----------------------------------------------------------------------------------------
 # parameters
 # -----------------------------------------------------------------------------------------
@@ -35,11 +46,12 @@ smoothening = 7                     # smoothening cursor move
 velocity = 0                        # cursor velocity
 distance = 0                        # distance between two points
 past_time = 0                       # to calculate velocity and fps
-prev_index_x, prev_index_y = 0, 0             # previous cursor position
-cur_index_x, cur_index_y = 0, 0               # current cursor position
-stopped_index_x, stopped_index_y = 0, 0       # last updated cursor position
+prev_index = [0, 0]             # previous cursor position
+cur_index = [0, 0]               # current cursor position
+stopped_index = [0, 0]       # last updated cursor position
 
 vib_dis = 4                         # vibration distance threshold
+in_mid_max_dis = 4                  # maximum sensing distance between index and middle fingertip
 pressed_key = 0                     # pressed key in keyboard
 is_initial = True                   # to reset prev, cur position
 
@@ -138,8 +150,8 @@ while True:
     # if hand is detected, proceed to the next process
     if len(lmList) != 0:
         # get the fingertip of the index and middle fingers
-        index_x, index_y = lmList[8][1:]
-        middle_x, middle_y = lmList[12][1:]
+        index_pos = lmList[8][1:]
+        middle_pos = lmList[12][1:]
 
         # check if fingers are up
         fingers = detector.fingers_up()
@@ -149,27 +161,28 @@ while True:
 
         # to prevent indexError, limit the position of index fingertip point
         # sometimes index fingertip position
-        if 0 <= index_x < 640 and 0 <= index_y < 480:
+        if 0 <= index_pos[0] < 640 and 0 <= index_pos[1] < 480:
             # get distance from depth sensor to fingertip
-            index_dis = depth_img_u8[index_y][index_x]
+            index_dis = depth_img_u8[index_pos[1]][index_pos[0]]
 
             # control the mouse only when it is closer than max_distance
             if index_dis <= max_dis:
                 # convert coordinates
-                cur_index_x = int(np.interp(index_x, (frame_reduc, cam_width - frame_reduc), (0, mouse_control.scr_width)))
-                cur_index_y = int(np.interp(index_y, (frame_reduc, cam_height - frame_reduc), (0, mouse_control.scr_height)))
+                cur_index = get_interp_pos(index_pos, frame_reduc, cam_width,
+                                                          cam_height, mouse_control.scr_width,
+                                                          mouse_control.scr_height)
                 # smoothen values
                 # if cur point is initial point, do not smoothening
                 if is_initial:
-                    prev_index_x, prev_index_y = cur_index_x, cur_index_y
+                    prev_index = cur_index
 
                 else:
-                    cur_index_x = int(prev_index_x + (cur_index_x - prev_index_x) / smoothening)
-                    cur_index_y = int(prev_index_y + (cur_index_y - prev_index_y) / smoothening)
+                    cur_index = get_smoothen_pos(prev_index, cur_index, smoothening)
 
                 # calculate distance between current cursor position and last cursor updated position
-                vir_dis = get_distance([cur_index_x, cur_index_y], [stopped_index_x, stopped_index_y])
+                vir_dis = get_distance(cur_index, stopped_index)
 
+                """
                 # -----------------------------------------------------------------------------------------
                 # Index and Middle Finger is stretched: Draw Mode
                 # -----------------------------------------------------------------------------------------
@@ -179,25 +192,64 @@ while True:
                     if vir_dis > vib_dis:
                         # move Mouse
                         # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
-                        #mouse.set_pos(cur_index_x, cur_index_y)
-                        cv2.circle(color_img, (index_x, index_y), 5, (255, 0, 255), cv2.FILLED)
+                        #mouse.set_pos(cur_index[0], cur_index[1])
+                        cv2.circle(color_img, (index_pos[0], index_pos[1]), 5, (255, 0, 255), cv2.FILLED)
                         # //2 operation: palette is quarter of the screen size
                         if not is_initial:
-                            paint.draw(is_initial, [prev_index_x // 2, prev_index_y // 2],
-                                       [cur_index_x // 2, cur_index_y // 2], velocity)
+                            paint.draw(is_initial, [prev_index[0] // 2, prev_index[1] // 2],
+                                       [cur_index[0] // 2, cur_index[1] // 2], velocity)
                         else:
                             is_initial = False
-                        stopped_index_x, stopped_index_y = prev_index_x, prev_index_y
+                        stopped_index = prev_index
 
                     # calculate distance between current position and previous position
                     # this operation used in calculating velocity
-                    distance = get_distance([cur_index_x, cur_index_y], [prev_index_x, prev_index_y])
+                    distance = get_distance(cur_index, prev_index)
                     # update previous position to current position
-                    prev_index_x, prev_index_y = cur_index_x, cur_index_y
-
+                    prev_index = cur_index
                 # -----------------------------------------------------------------------------------------
                 # Index or Middle Finger is bend: Not Draw Mode
                 # -----------------------------------------------------------------------------------------
+                else:
+                    # make initial flag True
+                    is_initial = True
+
+                """
+                # -----------------------------------------------------------------------------------------
+                # Distance of Index and Middle Finger is close: Draw Mode
+                # -----------------------------------------------------------------------------------------
+                # change coordinate of index and middle fingertip positions
+                cur_index = get_interp_pos(index_pos, frame_reduc, cam_width,
+                                                          cam_height, mouse_control.scr_width,
+                                                          mouse_control.scr_height)
+
+                cur_middle = get_interp_pos(middle_pos, frame_reduc, cam_width,
+                                                          cam_height, mouse_control.scr_width,
+                                                          mouse_control.scr_height)
+                # get distance between two fingertips
+                Index_Middle_dis = get_distance(cur_index, cur_middle)
+
+                # if distance between two fingertips are small, draw line in the palette
+                if Index_Middle_dis <= in_mid_max_dis:
+                    # to reduce effect of vibration
+                    if vir_dis > vib_dis:
+                        # move Mouse
+                        # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
+                        #mouse.set_pos(cur_index[0], cur_index[1])
+                        cv2.circle(color_img, (index_pos[0], index_pos[1]), 5, (255, 0, 255), cv2.FILLED)
+                        # //2 operation: palette is quarter of the screen size
+                        if not is_initial:
+                            paint.draw(is_initial, [prev_index[0] // 2, prev_index[1] // 2],
+                                       [cur_index[0] // 2, cur_index[1] // 2], velocity)
+                        else:
+                            is_initial = False
+                        stopped_index = prev_index
+
+                    # calculate distance between current position and previous position
+                    # this operation used in calculating velocity
+                    distance = get_distance(cur_index, prev_index)
+                    # update previous position to current position
+                    prev_index = cur_index
                 else:
                     # make initial flag True
                     is_initial = True
