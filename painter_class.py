@@ -15,9 +15,12 @@ class Paint:
         cv2.imshow("palette", self.src)
 
     # function that draw line in the palette(self.src)
-    def draw(self, is_initial, prev_loc=0, cur_loc=0, velocity=0):
+    def draw(self, is_initial, prev_loc=0, cur_loc=0, velocity=0, fixed_radius=0):
         # calculate radius
-        radius = self.change_radius(velocity)
+        if fixed_radius == 0:
+            radius = self.change_radius(velocity)
+        else:
+            radius = fixed_radius
 
         # if cur mouse position is not first position, draw line between prev and cur position at palette
         if not is_initial:
