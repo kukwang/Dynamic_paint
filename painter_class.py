@@ -22,14 +22,14 @@ class Paint:
         # if cur mouse position is not first position, draw line between prev and cur position at palette
         if not is_initial:
             cv2.line(self.src, prev_loc, cur_loc, self.bgr, thickness=radius, lineType=cv2.LINE_AA)
-
+        print("velocity:", velocity, "radius:", radius)
         cv2.imshow("palette", self.src)
 
     # function that change brush size according to velocity of index fingertip
     def change_radius(self, velocity):
         # parameters that we use to calculate brush size(radius)
         scaling = 3
-        sensitivity = 0.1
+        sensitivity = 0.09
         velo_shift = 30
         radius_smoothening = 7
 
