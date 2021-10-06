@@ -4,7 +4,6 @@ By: Murtaza Hassan
 Youtube: https://www.youtube.com/watch?v=8gPONnGIPgw
 Website: https://www.computervision.zone/courses/ai-virtual-mouse/
 Modified by Kwangsoo Seol
-Using win32api
 """
 import pyrealsense2 as rs
 import cv2
@@ -14,6 +13,7 @@ import time
 import hand_tracing
 import painter_class
 from win32api import GetSystemMetrics
+
 
 # -----------------------------------------------------------------------------------------
 # helper function
@@ -130,6 +130,7 @@ while True:
     depth_img = cv2.flip(depth_img, 1)
 
     color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
+    depth_img_reduc = depth_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
     # -----------------------------------------------------------------------------------------
 
     # find hand and its landmarks
@@ -203,7 +204,7 @@ while True:
                 cv2.putText(color_img_reduc, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
     # apply colormap on depth image (image must be converted to 8-bit per pixel first)
-    depth_img = cv2.applyColorMap(cv2.convertScaleAbs(depth_img, alpha=0.03), cv2.COLORMAP_JET)
+    depth_img_reduc = cv2.applyColorMap(cv2.convertScaleAbs(depth_img_reduc, alpha=0.03), cv2.COLORMAP_JET)
 
     # calculate fps and velocity(pixel / sec / 50)
     cur_time = time.time()
@@ -218,7 +219,7 @@ while True:
 
     # display color and depth image
     cv2.imshow("color_img_reduc", color_img_reduc)
-    cv2.imshow("depth_img", depth_img)
+    cv2.imshow("depth_img_reduc", depth_img_reduc)
 
     # ESC breaks the while loop
     pressed_key = cv2.waitKey(1)
