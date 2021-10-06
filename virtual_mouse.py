@@ -12,9 +12,8 @@ import numpy as np
 import time
 
 import hand_tracing
-import mouse_control
 import painter_class
-
+from win32api import GetSystemMetrics
 
 # -----------------------------------------------------------------------------------------
 # helper function
@@ -47,12 +46,14 @@ smoothening = 7                     # smoothening cursor move
 velocity = 0                        # cursor velocity
 distance = 0                        # distance between two points
 past_time = 0                       # to calculate velocity and fps
-prev_index = [0, 0]             # previous cursor position
-cur_index = [0, 0]               # current cursor position
-stopped_index = [0, 0]       # last updated cursor position
+prev_index = [0, 0]                 # previous cursor position
+cur_index = [0, 0]                  # current cursor position
+stopped_index = [0, 0]              # last updated cursor position
+
+scr_width, scr_height = GetSystemMetrics(0), GetSystemMetrics(1)    # get width and height of the monitor
 
 vib_dis = 4                         # vibration distance threshold
-in_mid_max_dis = 200                  # maximum sensing distance between index and middle fingertip
+in_mid_max_dis = 200                # maximum sensing distance between index and middle fingertip
 pressed_key = 0                     # pressed key in keyboard
 is_initial = True                   # to reset prev, cur position
 
@@ -103,8 +104,7 @@ align = rs.align(align_to)
 
 # assign HandDetector and Mouse class
 detector = hand_tracing.HandDetector(maxHands=1)
-#mouse = mouse_control.Mouse()
-paint = painter_class.Paint(width=int(mouse_control.scr_width), height=int(mouse_control.scr_height))
+paint = painter_class.Paint(width=int(scr_width), height=int(scr_height))
 
 # -----------------------------------------------------------------------------------------
 # start drawing
@@ -128,9 +128,9 @@ while True:
     depth_img = np.asanyarray(aligned_depth_frame.get_data())
     color_img = cv2.flip(color_img, 1)
     depth_img = cv2.flip(depth_img, 1)
-    # -----------------------------------------------------------------------------------------
 
     color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
+    # -----------------------------------------------------------------------------------------
 
     # find hand and its landmarks
     color_img = detector.find_hands(color_img, draw=True)
@@ -157,9 +157,7 @@ while True:
             # control the mouse only when it is closer than max_distance
             if index_dis <= max_dis:
                 # convert coordinates
-                cur_index = get_interp_pos(index_pos, frame_reduc, cam_width,
-                                                          cam_height, mouse_control.scr_width,
-                                                          mouse_control.scr_height)
+                cur_index = get_interp_pos(index_pos, frame_reduc, cam_width, cam_height, scr_width, scr_height)
                 # smoothen values
                 # if cur point is initial point, do not smoothening
                 if is_initial:
@@ -174,13 +172,12 @@ while True:
                 # -----------------------------------------------------------------------------------------
                 # Index and Middle Finger is stretched: Draw Mode
                 # -----------------------------------------------------------------------------------------
-                # if middle finger is stretched, draw line in the palette
+                # if index and middle finger are stretched, draw line in the palette
                 if fingers[1] == 1 and fingers[2] == 1:
                     # to reduce effect of vibration
                     if vir_dis > vib_dis:
                         # move Mouse
                         # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
-                        #mouse.set_pos(cur_index[0], cur_index[1])
                         cv2.circle(color_img, (index_pos[0], index_pos[1]), 5, (255, 0, 255), cv2.FILLED)
                         # //2 operation: palette is quarter of the screen size
                         if not is_initial:
