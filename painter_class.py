@@ -6,7 +6,7 @@ import numpy as np
 class Paint:
     # palette is quarter of the screen size
     def __init__(self, width=1920, height=1080):
-        self.bgr = [0, 0, 0]    # rgb color of brush
+        self.bgr_black = [0, 0, 0]    # bgr black
         # palette: size is (height//2 * width//2), 3 channels, color is white
         self.src = np.full((height//2, width//2, 3), 255, dtype=np.uint8)
         self.prev_radius, self.cur_radius = 0, 0    # previous and current radius, initial value is 0
@@ -24,7 +24,7 @@ class Paint:
 
         # if cur mouse position is not first position, draw line between prev and cur position at palette
         if not is_initial:
-            cv2.line(self.src, prev_loc, cur_loc, self.bgr, thickness=radius, lineType=cv2.LINE_AA)
+            cv2.line(self.src, prev_loc, cur_loc, self.bgr_black, thickness=radius, lineType=cv2.LINE_AA)
         print("velocity:", velocity, "radius:", radius)
         cv2.imshow("palette", self.src)
 
@@ -32,11 +32,11 @@ class Paint:
     def change_radius(self, velocity):
         # parameters that we use to calculate brush size(radius)
         scaling = 3
-        sensitivity = 0.09
+        sensitivity = 0.095
         velo_shift = 30
         radius_smoothening = 7
 
-        max_radius = 50     # max radius of brush
+        max_radius = 30     # max radius of brush
         min_radius = 3      # min radius of brush
 
         # update current radius using current velocity
