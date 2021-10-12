@@ -52,12 +52,10 @@ stopped_index = [0, 0]              # last updated cursor position
 
 scr_width, scr_height = GetSystemMetrics(0), GetSystemMetrics(1)    # get width and height of the monitor
 
-vib_dis = 4                         # vibration distance threshold
+max_vib_dis = 4                         # vibration distance threshold
 in_mid_max_dis = 200                # maximum sensing distance between index and middle fingertip
 pressed_key = 0                     # pressed key in keyboard
 is_initial = True                   # to reset prev, cur position
-
-prev_depth, cur_depth = 0, 0
 
 # -----------------------------------------------------------------------------------------
 # connect to depth camera
@@ -102,130 +100,130 @@ max_dis = max_dis_in_meters / depth_scale
 align_to = rs.stream.color
 align = rs.align(align_to)
 
-# assign HandDetector and Mouse class
-detector = hand_tracing.HandDetector(maxHands=1)
-paint = painter_class.Paint(width=int(scr_width), height=int(scr_height))
-
-# -----------------------------------------------------------------------------------------
-# start drawing
-# -----------------------------------------------------------------------------------------
 while True:
+    # assign HandDetector and Mouse class
+    detector = hand_tracing.HandDetector(maxHands=1)
+    paint = painter_class.Paint(width=int(scr_width), height=int(scr_height))
     # -----------------------------------------------------------------------------------------
-    # get color, depth image from depth camera
+    # start drawing
     # -----------------------------------------------------------------------------------------
-    frames = pipeline.wait_for_frames()
-    aligned_frames = align.process(frames)
-    aligned_depth_frame = aligned_frames.get_depth_frame()
-    color_frame = aligned_frames.get_color_frame()
+    while True:
+        # -----------------------------------------------------------------------------------------
+        # get color, depth image from depth camera
+        # -----------------------------------------------------------------------------------------
+        frames = pipeline.wait_for_frames()
+        aligned_frames = align.process(frames)
+        aligned_depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
 
-    # if one of two(color, depth image) is not detected, continue
-    if not aligned_depth_frame or not color_frame:
-        continue
+        # if one of two(color, depth image) is not detected, continue
+        if not aligned_depth_frame or not color_frame:
+            continue
 
-    # data type of color_img: numpy.uint8(cv2.CV_8U)
-    # data type of depth_img: numpy.uint16(cv2.CV_16U)
-    color_img = np.asanyarray(color_frame.get_data())
-    depth_img = np.asanyarray(aligned_depth_frame.get_data())
-    color_img = cv2.flip(color_img, 1)
-    depth_img = cv2.flip(depth_img, 1)
+        # data type of color_img: numpy.uint8(cv2.CV_8U)
+        # data type of depth_img: numpy.uint16(cv2.CV_16U)
+        color_img = np.asanyarray(color_frame.get_data())
+        depth_img = np.asanyarray(aligned_depth_frame.get_data())
+        color_img = cv2.flip(color_img, 1)
+        depth_img = cv2.flip(depth_img, 1)
 
-    color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
-    depth_img_reduc = depth_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
-    # -----------------------------------------------------------------------------------------
+        color_img_reduc = color_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
+        depth_img_reduc = depth_img[frame_reduc:cam_height - frame_reduc, frame_reduc:cam_width - frame_reduc]
+        # -----------------------------------------------------------------------------------------
 
-    # find hand and its landmarks
-    color_img = detector.find_hands(color_img, draw=True)
-    lmList, _ = detector.find_position(color_img, draw=False)
+        # find hand and its landmarks
+        color_img = detector.find_hands(color_img, draw=False)
+        lmList, _ = detector.find_position(color_img, draw=False)
 
-    # if hand is detected, proceed to the next process
-    if len(lmList) != 0:
-        # get the fingertip of the index and middle fingers
-        index_pos = lmList[8][1:]
-        middle_pos = lmList[12][1:]
+        # if hand is detected, proceed to the next process
+        if len(lmList) != 0:
+            # get the fingertip of the index and middle fingers
+            index_pos = lmList[8][1:]
+            middle_pos = lmList[12][1:]
 
-        # check if fingers are up
-        fingers = detector.fingers_up()
-        # show fingertip sense area in the color image
-        cv2.rectangle(color_img, (frame_reduc, frame_reduc),
-                      (cam_width - frame_reduc, cam_height - frame_reduc), (255, 0, 255), 2)
+            # check if fingers are up
+            fingers = detector.fingers_up()
+            # show fingertip sense area in the color image
+            cv2.rectangle(color_img, (frame_reduc, frame_reduc),
+                          (cam_width - frame_reduc, cam_height - frame_reduc), (255, 0, 255), 2)
 
-        # to prevent indexError, limit the position of index fingertip point
-        # sometimes index fingertip position
-        if 0 <= index_pos[0] < 640 and 0 <= index_pos[1] < 480:
-            # get distance from depth sensor to fingertip
-            index_dis = depth_img[index_pos[1]][index_pos[0]]
+            # to prevent indexError, limit the position of index fingertip point
+            # sometimes index fingertip position
+            if 0 <= index_pos[0] < 640 and 0 <= index_pos[1] < 480:
+                # get distance from depth sensor to fingertip
+                index_dis = depth_img[index_pos[1]][index_pos[0]]
 
-            # control the mouse only when it is closer than max_distance
-            if index_dis <= max_dis:
-                # convert coordinates
-                cur_index = get_interp_pos(index_pos, frame_reduc, cam_width, cam_height, scr_width, scr_height)
-                # smoothen values
-                # if cur point is initial point, do not smoothening
-                if is_initial:
-                    prev_index = cur_index
+                # control the mouse only when it is closer than max_distance
+                if index_dis <= max_dis:
+                    # convert coordinates
+                    cur_index = get_interp_pos(index_pos, frame_reduc, cam_width, cam_height, scr_width, scr_height)
+                    # smoothen values
+                    # if cur point is initial point, do not smoothening
+                    if is_initial:
+                        prev_index = cur_index
 
-                else:
-                    cur_index = get_smoothen_pos(prev_index, cur_index, smoothening)
+                    else:
+                        cur_index = get_smoothen_pos(prev_index, cur_index, smoothening)
 
-                # calculate distance between current cursor position and last cursor updated position
-                vir_dis = get_distance(cur_index, stopped_index)
+                    # -----------------------------------------------------------------------------------------
+                    # Index and Middle Finger is stretched: Draw Mode
+                    # -----------------------------------------------------------------------------------------
+                    # if index and middle finger are stretched, draw line in the palette
+                    if fingers[1] == 1 and fingers[2] == 1:
 
-                # -----------------------------------------------------------------------------------------
-                # Index and Middle Finger is stretched: Draw Mode
-                # -----------------------------------------------------------------------------------------
-                # if index and middle finger are stretched, draw line in the palette
-                if fingers[1] == 1 and fingers[2] == 1:
-                    # to reduce effect of vibration
-                    if vir_dis > vib_dis:
-                        # move Mouse
-                        # mouse.set_pos(0, 0): top right, (scr_width, scr_height): bottom left
-                        cv2.circle(color_img, (index_pos[0], index_pos[1]), 5, (255, 0, 255), cv2.FILLED)
-                        # //2 operation: palette is quarter of the screen size
-                        if not is_initial:
-                            paint.draw(is_initial, [prev_index[0] // 2, prev_index[1] // 2],
-                                       [cur_index[0] // 2, cur_index[1] // 2], velocity)
-                        else:
-                            is_initial = False
-                        stopped_index = prev_index
+                        # calculate distance between current cursor position and last cursor updated position
+                        vir_dis = get_distance(cur_index, stopped_index)
+                        # to reduce effect of vibration
+                        if vir_dis > max_vib_dis:
+                            # draw circle at the index fingertip location in the color image frame
+                            cv2.circle(color_img, index_pos, 5, (255, 0, 255), cv2.FILLED)
+                            # if this is not the initial point, draw a line
+                            if not is_initial:
+                                # //2 operation: palette size is quarter of the screen size
+                                paint.draw(is_initial, [prev_index[0] // 2, prev_index[1] // 2],
+                                           [cur_index[0] // 2, cur_index[1] // 2], velocity)
+                            else:
+                                is_initial = False
+                            stopped_index = prev_index
 
-                    # calculate distance between current position and previous position
-                    # this operation used in calculating velocity
-                    distance = get_distance(cur_index, prev_index)
-                    # update previous position to current position
-                    prev_index = cur_index
-                # -----------------------------------------------------------------------------------------
-                # Index or Middle Finger is bend: Not Draw Mode
-                # -----------------------------------------------------------------------------------------
-                else:
-                    # make initial flag True
-                    is_initial = True
+                        # calculate distance between current position and previous position
+                        # this operation used in calculating velocity
+                        distance = get_distance(cur_index, prev_index)
+                        # update previous position to current position
+                        prev_index = cur_index
+                        # show distance between current cursor position and last cursor updated position in color image
+                        cv2.putText(color_img_reduc, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+                    # -----------------------------------------------------------------------------------------
+                    # Index or Middle Finger is bend: Not Draw Mode
+                    # -----------------------------------------------------------------------------------------
+                    else:
+                        # make initial flag True
+                        is_initial = True
 
-                # show distance between current cursor position and last cursor updated position in color image
-                cv2.putText(color_img_reduc, str(vir_dis) + 'pixel', (20, 90), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+        # apply colormap on depth image (image must be converted to 8-bit per pixel first)
+        depth_img_reduc = cv2.applyColorMap(cv2.convertScaleAbs(depth_img_reduc, alpha=0.03), cv2.COLORMAP_JET)
 
-    # apply colormap on depth image (image must be converted to 8-bit per pixel first)
-    depth_img_reduc = cv2.applyColorMap(cv2.convertScaleAbs(depth_img_reduc, alpha=0.03), cv2.COLORMAP_JET)
+        # calculate fps and velocity(pixel / sec / 50)
+        cur_time = time.time()
+        fps = 1 / (cur_time - past_time)
+        velocity = int(distance / (cur_time - past_time) / 50)
+        past_time = cur_time
 
-    # calculate fps and velocity(pixel / sec / 50)
-    cur_time = time.time()
-    fps = 1 / (cur_time - past_time)
-    velocity = int(distance / (cur_time - past_time) / 50)
-    past_time = cur_time
+        # show fps and velocity in color image
+        cv2.putText(color_img_reduc, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
+        cv2.putText(color_img_reduc, str(velocity) + 'pixel / second / scale_factor',
+                    (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
 
-    # show fps and velocity in color image
-    cv2.putText(color_img_reduc, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
-    cv2.putText(color_img_reduc, str(velocity) + 'pixel / second / scale_factor',
-                (20, 70), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 1)
+        # display color and depth image
+        cv2.imshow("depth_img_reduc", depth_img_reduc)
+        cv2.imshow("color_img_reduc", color_img_reduc)
 
-    # display color and depth image
-    cv2.imshow("color_img_reduc", color_img_reduc)
-    cv2.imshow("depth_img_reduc", depth_img_reduc)
-
-    # ESC breaks the while loop
-    pressed_key = cv2.waitKey(1)
+        # ESC breaks the while loop
+        pressed_key = cv2.waitKey(1)
+        if pressed_key == 27 or pressed_key == 114:
+            break
     if pressed_key == 27:
         break
-
 # release camera and close the window
 cv2.destroyAllWindows()
 pipeline.stop()
