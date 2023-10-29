@@ -10,7 +10,9 @@ Virtual mouse using Intel RealSense Depth Camera D435. Use [mediapipe](https://g
 4. Draw circle according to speed of the finger
 5. Repeat 1-4 until stop
 
-## Example
+## Examples
+#### Example 1
 ![example1](https://github.com/kukwang/dynamic_paint/assets/52880303/aded3e94-35db-4cf6-9d74-13230d06c991)
 
-![example2](https://github.com/kukwang/dynamic_paint/assets/52880303/1373cc94-a7e5-4778-ac8d-1022b)
+#### Example 2
+![example2](https://github.com/kukwang/Dynamic_paint/assets/52880303/dfa11538-dabe-4b72-804d-bd9de61a532e)
