@@ -12,4 +12,5 @@ Virtual mouse using Intel RealSense Depth Camera D435. Use [mediapipe](https://g
 
 ## Example
 ![example1](https://github.com/kukwang/dynamic_paint/assets/52880303/aded3e94-35db-4cf6-9d74-13230d06c991)
-![example2](https://github.com/kukwang/dynamic_paint/assets/52880303/1373cc94-a7e5-4778-ac8d-1022b
+
+![example2](https://github.com/kukwang/dynamic_paint/assets/52880303/1373cc94-a7e5-4778-ac8d-1022b)
