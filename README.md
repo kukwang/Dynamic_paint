@@ -1,7 +1,7 @@
 # Dynamic Paint
 
 ## Introduction
-Virtual mouse using Intel RealSense Depth Camera D435. Use [mediapipe](https://github.com/google/mediapipe)
+Virtual mouse using Intel RealSense Depth Camera D435. We use [mediapipe](https://github.com/google/mediapipe) framework to detect hand.
 
 ## Process
 1. Get RGB and Depth information from depth camera
